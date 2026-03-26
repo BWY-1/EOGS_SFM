@@ -1,0 +1,20 @@
+tyro
+opencv-python
+setuptools
+wheel
+packaging
+matplotlib
+numpy
+rpcm   失败 最后安
+scikit-learn
+pyproj
+plyfile
+iio
+tqdm
+pillow
+tensorboard
+rasterio 失败   pip install rasterio==1.3.10
+plyflatten失败
+numba
+utm
+jaxtyping
