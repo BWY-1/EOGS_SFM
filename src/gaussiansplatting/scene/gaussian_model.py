@@ -137,6 +137,7 @@ class GaussianModel:
         init_opacity: float = 0.01,
         init_scale_multiplier: float = 1.0,
         init_scale_floor: float = 0.0,
+        init_scale_ceiling: float = 0.0,
         init_random_points: int = 0,
         init_random_points_bbox_scale: float = 1.1
     ):
@@ -189,6 +190,8 @@ class GaussianModel:
         initial_scale = init_scale_multiplier * torch.sqrt(dist2)
         if init_scale_floor > 0:
             initial_scale = torch.clamp_min(initial_scale, init_scale_floor)
+        if init_scale_ceiling > 0:
+            initial_scale = torch.clamp_max(initial_scale, init_scale_ceiling)
         scales = self.scaling_inverse_activation(initial_scale)[...,None].repeat(1, 3)
         rots = torch.zeros((fused_point_cloud.shape[0], 4), device="cuda")
         rots[:, 0] = 1

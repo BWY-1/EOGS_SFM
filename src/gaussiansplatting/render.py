@@ -36,9 +36,12 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
 
 
 
-    if 'IARPA' in base_path:
+    # if 'IARPA' in base_path:
+    base_path_lower = base_path.lower()
+    if 'iarpa' in base_path_lower:
         dataset_resolution = 0.3
-    elif 'JAX' in base_path:
+    # elif 'JAX' in base_path:
+    elif 'jax' in base_path_lower:
         dataset_resolution = 0.5
     else:
         dataset_resolution = resolution
@@ -81,6 +84,7 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
                 views[i].load_state_dict(cc[j]["state_dict"])
                 views[i] = views[i].to(gaussians._xyz.device)                    
 
+    opacity_means = []
     for idx, view in enumerate(tqdm(views, desc="Rendering progress")):
         name = "{0:05d}.iio".format(idx)
         gt = view.original_image[0:3, :, :]
@@ -89,6 +93,7 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
         raw_render = render_pkg[:3]
         altitude_render = render_pkg[3]
         accumulated_opacity_render = render_pkg[4]
+        opacity_means.append(float(accumulated_opacity_render.mean().item()))
 
         rendered_uva = torch.stack(view.UV_grid+(altitude_render,), dim=-1)
         # rendered_uva back to utm space
@@ -203,6 +208,18 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
         profile["transform"] = affine.Affine(dataset_resolution, 0.0, xoff, 0.0, -dataset_resolution, yoff)
         with rasterio.open(os.path.join(base_path, "dsm", name), "w", **profile) as f:
             f.write(dsm[:, :, 0], 1)
+    if len(opacity_means) > 0:
+        mean_opacity = float(sum(opacity_means) / len(opacity_means))
+        max_opacity = float(max(opacity_means))
+        min_opacity = float(min(opacity_means))
+        print(
+            f"[RENDER][ACC_OPACITY] min={min_opacity:.6f}, mean={mean_opacity:.6f}, max={max_opacity:.6f}"
+        )
+        if max_opacity < 1e-3:
+            print(
+                "[RENDER][WARN] Accumulated opacity is near zero for all views. "
+                "Rendered images may be background-only (magenta)."
+            )
 
 
 def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, skip_train : bool, skip_test : bool, opacity_treshold : float = None, resolution: float = 0.5):

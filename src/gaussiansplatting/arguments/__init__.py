@@ -54,9 +54,10 @@ class ModelParams(ParamGroup):
         self._white_background = False
         self.data_device = "cuda"
         self.eval = False
-        self.init_opacity = 0.01
-        self.init_scale_multiplier = 1.0
+        self.init_opacity =0.03#0.01
+        self.init_scale_multiplier =1.0
         self.init_scale_floor = 0.0
+        self.init_scale_ceiling = 0.02
         self.init_random_points = 0
         self.init_random_points_bbox_scale = 1.1
         super().__init__(parser, "Loading Parameters", sentinel)
@@ -81,7 +82,7 @@ class OptimizationParams(ParamGroup):
         self.position_lr_delay_mult = 0.01
         self.position_lr_max_steps = 30_000
         self.feature_lr = 0.0025
-        self.opacity_lr = 0.05
+        self.opacity_lr =0.02# 0.05
         self.scaling_lr = 0.005
         self.rotation_lr = 0.001
         self.percent_dense = 0.01
@@ -91,7 +92,7 @@ class OptimizationParams(ParamGroup):
         self.densify_from_iter = 500
         self.densify_until_iter = 15_000
         self.densify_grad_threshold = 2e-6 #0.0002
-        self.random_background = True #False # TODO: Maybe should be True?
+        self.random_background = False#True #False # TODO: Maybe should be True?
 
         #####################################
         # EOGS specific parameters
@@ -101,7 +102,7 @@ class OptimizationParams(ParamGroup):
         self.color_reset_iterations = 9999999999
 
         # loss terms starting iterations
-        self.iterstart_L_opacity = -1 # TODO: start at 1000
+        self.iterstart_L_opacity = 1000#-1 # TODO: start at 1000
         self.iterstart_L_sun_resample = 9999999999
         self.iterstart_L_new_resample = 1000
         self.iterstart_L_TV_altitude = 9999999999
@@ -110,7 +111,7 @@ class OptimizationParams(ParamGroup):
         self.iterstart_L_accumulated_opacity = 9999999999
 
         # loss terms weights
-        self.w_L_opacity = 0.10
+        self.w_L_opacity =0.005#0.10
         self.w_L_sun_altitude_resample = 0.01
         self.w_L_sun_rgb_resample = 0.10
         self.w_L_new_altitude_resample = 0.01
@@ -124,6 +125,8 @@ class OptimizationParams(ParamGroup):
         # other hyperparameters
         self.virtual_camera_extent = 0.01
         self.prune_opacity_threshold = -6.0
+        self.prune_from_iter = 1000
+        self.min_gaussian_keep_ratio =0.20
 
         super().__init__(parser, "Optimization Parameters")
 

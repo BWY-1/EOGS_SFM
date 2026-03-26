@@ -397,10 +397,26 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             
             # Pruining
             # transparent_mask = gaussians._opacity.squeeze() < -6.0
-            transparent_mask = gaussians._opacity.squeeze() < opt.prune_opacity_threshold
-            if transparent_mask.any():
-                gaussians.prune_points(transparent_mask)
-
+            # transparent_mask = gaussians._opacity.squeeze() < opt.prune_opacity_threshold
+            # if transparent_mask.any():
+            #     gaussians.prune_points(transparent_mask)
+            if iteration >= opt.prune_from_iter:
+                transparent_mask = gaussians._opacity.squeeze() < opt.prune_opacity_threshold
+                if transparent_mask.any():
+                    # Avoid over-pruning for externally initialized clouds.
+                    current_n = gaussians._xyz.shape[0]
+                    min_keep = max(1, int(init_number_of_gaussians * opt.min_gaussian_keep_ratio))
+                    max_prune = max(0, current_n - min_keep)
+                    prune_idx = torch.where(transparent_mask)[0]
+                    if prune_idx.numel() > max_prune:
+                        op = gaussians._opacity.squeeze()
+                        order = torch.argsort(op[prune_idx])  # lower opacity first
+                        selected = prune_idx[order[:max_prune]]
+                        limited_mask = torch.zeros_like(transparent_mask, dtype=torch.bool)
+                        limited_mask[selected] = True
+                        transparent_mask = limited_mask
+                    if transparent_mask.any():
+                        gaussians.prune_points(transparent_mask)
             if iteration == opt.color_reset_iterations:
                 to_reset = torch.full((gaussians._xyz.size(0),), False, device="cuda", dtype=bool)
                 myoutput = render_all_views(scene.getTrainCameras(), gaussians, pipe)

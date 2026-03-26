@@ -1,6 +1,7 @@
 import argparse
 import json
-
+import os
+from glob import glob
 import numpy as np
 from plyfile import PlyData
 
@@ -28,7 +29,20 @@ def read_affine(path: str):
     )
 
 
-def read_ply_xyz(path: str):
+def read_ply_xyz(path: str):   
+    if not os.path.exists(path):
+        parent = os.path.dirname(path) or "."
+        basename = os.path.basename(path)
+        suggestions = []
+        if os.path.isdir(parent):
+            for cand in glob(os.path.join(parent, "*.ply")):
+                cand_base = os.path.basename(cand)
+                if cand_base.lower() == basename.lower() or "points3d" in cand_base.lower():
+                    suggestions.append(cand)
+        suggestion_msg = ""
+        if suggestions:
+            suggestion_msg = "\nDid you mean one of:\n  - " + "\n  - ".join(sorted(set(suggestions)))
+        raise FileNotFoundError(f"Input ply not found: {path}{suggestion_msg}")
     ply = PlyData.read(path)
     v = ply["vertex"]
     return np.vstack([v["x"], v["y"], v["z"]]).T.astype(np.float64)
@@ -66,6 +80,15 @@ def main():
     parser.add_argument("--input-ply", required=True)
     parser.add_argument("--affine-models-json", required=True)
     parser.add_argument("--bounds-margin", type=float, default=0.10)
+    parser.add_argument(
+        "--input-coord",
+        choices=["auto", "normalized", "utm", "bbox_fit"],
+        default="auto",
+        help=(
+            "How to interpret --input-ply for diagnostics. "
+            "'bbox_fit' is treated as 'normalized' because converter outputs world coordinates."
+        ),
+    )
     args = parser.parse_args()
 
     center, scale, min_world, max_world, camera_models = read_affine(args.affine_models_json)
@@ -77,6 +100,29 @@ def main():
 
     xyz_as_normalized = xyz
     xyz_as_utm = (xyz - center[None]) / scale
+
+
+    if args.input_coord in ("normalized", "bbox_fit"):
+        if args.input_coord == "bbox_fit":
+            print("[INFO] --input-coord bbox_fit is interpreted as normalized output coordinates.")
+        summarize("Assume input is normalized", xyz_as_normalized, low, high)
+        n_min, n_mean, n_max = camera_consistency_stats(xyz_as_normalized, camera_models)
+        print(
+            "\nCamera consistency ratio stats across cameras (uv in [-1,1] and altitude in [min_alt,max_alt]):\n"
+            f"- normalized: min={n_min:.4f}, mean={n_mean:.4f}, max={n_max:.4f}"
+        )
+        return
+
+    if args.input_coord == "utm":
+        summarize("Assume input is UTM", xyz_as_utm, low, high)
+        u_min, u_mean, u_max = camera_consistency_stats(xyz_as_utm, camera_models)
+        print(
+            "\nCamera consistency ratio stats across cameras (uv in [-1,1] and altitude in [min_alt,max_alt]):\n"
+            f"- utm: min={u_min:.4f}, mean={u_mean:.4f}, max={u_max:.4f}"
+        )
+        return
+    
+
 
     summarize("Assume input is normalized", xyz_as_normalized, low, high)
     summarize("Assume input is UTM", xyz_as_utm, low, high)

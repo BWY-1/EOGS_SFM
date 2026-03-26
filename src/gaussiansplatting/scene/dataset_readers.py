@@ -110,7 +110,12 @@ def fetchPly(path):
     plydata = PlyData.read(path)
     vertices = plydata['vertex']
     positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T
-    colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T
+    # colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T
+    colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T.astype(np.float32)
+    # Keep compatibility with both [0,1] and [0,255] color encodings in PLY.
+    if colors.size > 0 and np.nanmax(colors) > 1.0:
+        colors = colors / 255.0
+    colors = np.clip(colors, 0.0, 1.0)
     normals = np.vstack([vertices['nx'], vertices['ny'], vertices['nz']]).T
     return BasicPointCloud(points=positions, colors=colors, normals=normals)
 

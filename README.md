@@ -74,22 +74,43 @@ python scripts/dataset_creation/to_affine.py --scene_name IARPA_003
 If you want to initialize training from an external sparse point cloud (e.g. SatelliteSfM), convert it to the normalized affine world frame and save it as `data/affine_models/{SCENE}/points3d.ply`:
 ```bash
 python scripts/dataset_creation/convert_satellitesfm_ply_to_eogs.py \
-  --input-ply /path/to/satellitesfm_sparse.ply \
-  --affine-models-json data/affine_models/JAX_004/affine_models.json \
-  --output-ply data/affine_models/JAX_004/points3d.ply \
+  --input-ply /home/m/EOGS-SFM/data/JAX_068/point_cloud.ply\
+  --affine-models-json data/affine_models/JAX_068/affine_models.json \
+  --output-ply data/affine_models/JAX_068/points3d.ply \
   --input-coord auto \
+  --dry-run-report \
   --crop-to-scene-bounds
 ```
+
+For SatelliteSfM ENU outputs, prefer explicit ENU conversion:
+```bash
+python scripts/dataset_creation/convert_satellitesfm_ply_to_eogs.py \
+  --input-ply /home/m/EOGS-SFM/data/JAX_068/point_cloud.ply\
+  --affine-models-json data/affine_models/JAX_068/affine_models.json \
+  --output-ply data/affine_models/JAX_068/points3d.ply \
+  --input-coord enu \
+  --enu-observer-json data/JAX_068/enu_observer_latlonalt.json
+```
+Important safety note for ENU conversion: this chain is most reliable on small scenes (roughly <1km², no UTM-zone crossing).  
+For larger areas, direct geodetic integration is recommended; ENU mode now enforces safety checks by default and can be overridden with `--allow-enu-unsafe`.
+
+
+`--input-coord auto` now falls back to `bbox_fit` by default when both `utm` and `normalized` do not match the affine bounds.  
+If you prefer strict behavior, set `--auto-fallback error`.
+For a more detailed auto-mode diagnosis (bbox + camera-consistency scoring), add `--dry-run-report`.
 
 If conversion reports `Output points: 0`, first retry without cropping (`--crop-to-scene-bounds`) to verify coordinate alignment, then tune `--input-coord` and `--bounds-margin`.
 
 You can diagnose coordinate mismatch before conversion:
 ```bash
 python scripts/dataset_creation/check_affine_pointcloud_alignment.py \
-  --input-ply /path/to/satellitesfm_sparse.ply \
-  --affine-models-json data/affine_models/JAX_004/affine_models.json
+  --input-ply /home/m/EOGS-SFM/data/affine_models/JAX_068/points3d.ply\
+  --affine-models-json data/affine_models/JAX_068/affine_models.json
 ```
-The checker also reports a first-camera consistency ratio (uv in `[-1,1]` and altitude within bounds), which is useful to detect cases where bbox overlap looks okay but rendering is still background-only.
+
+If you are checking a converted output from `--input-coord bbox_fit`, you can pass `--input-coord bbox_fit` to the checker (it will be interpreted as normalized/world coordinates).
+Note: the default converted filename is `points3d.ply` (lowercase `d`).
+The checker also reports camera consistency ratio stats across cameras (uv in `[-1,1]` and altitude within bounds), which is useful to detect cases where bbox overlap looks okay but rendering is still background-only.
 
 Important: use the `affine_models.json` generated under `data/affine_models/{SCENE}/`, not a raw metadata file in another folder.
 If both `utm` and `normalized` diagnostics fail (in-bounds ratio near 0), try:
@@ -102,10 +123,17 @@ python scripts/dataset_creation/convert_satellitesfm_ply_to_eogs.py \
   --bbox-fit-pca-align \
   --bbox-fit-anisotropic
 ```
+Tip: for isotropic bbox fitting, the converter now defaults to `--bbox-fit-isotropic-axes xy` to avoid altitude range dominating the scale.
+If converter warns that `z_span` is much larger than affine bbox Z span, prefer `--bbox-fit-anisotropic` (or lower `--bbox-fit-fill-ratio`).
 
-
-
-
+cd src/gaussiansplatting
+python train.py \
+  -s /home/m/EOGS-SFM/data/affine_models/JAX_068 \
+  --images /home/m/EOGS-SFM/data/JAX_068/images \
+  --eval \
+  -m /home/m/EOGS-SFM/output/jax068_debug \
+  --sh_degree 0 \
+  --iterations 10000
 
 
 ## How to reproduce the results
@@ -124,3 +152,21 @@ bash train.sh reproduceMain
 
 > [!TIP]
 > When using uv: if `No module named 'torch'` when install: `submodules/diff-gaussian-rasterization`, `--no-build-isolation` (recommended by the latest uv version)
+
+
+dsm_name=$(ls /home/m/EOGS-SFM/output/jax068_debug_safe2/test_opNone/ours_7000/dsm/ | sort -V | tail -n 1)
+
+python /home/m/EOGS-SFM/scripts/eval/eval_dsm.py \
+  --pred-dsm-path /home/m/EOGS-SFM/output/jax068_debug_safe2/test_opNone/ours_7000/dsm/${dsm_name} \
+  --gt-dir /home/m/EOGS-SFM/data/truth/JAX_068 \
+  --out-dir /home/m/EOGS-SFM/output/jax068_debug_safe2\
+  --aoi-id JAX_068
+
+
+python scripts/dataset_creation/convert_satellitesfm_ply_to_eogs.py \
+  --input-ply /home/m/EOGS-SFM/data/JAX_068/point_cloud.ply \
+  --affine-models-json /home/m/EOGS-SFM/data/affine_models/JAX_068/affine_models.json \
+  --output-ply /home/m/EOGS-SFM/data/affine_models/JAX_068/points3d_enu.ply \
+  --input-coord enu \
+  --enu-observer-json /path/to/enu_observer_latlonalt.json \
+  --dry-run-report

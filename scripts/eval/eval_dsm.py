@@ -64,6 +64,20 @@ def dsm_pointwise_diff(in_dsm_path: str, gt_dsm_path: str, dsm_metadata, water_m
         tree_mask = rasterio.open(tree_mask_path).read()[0,...] > 0.5
         pred_dsm[np.logical_not(tree_mask)] = np.nan
 
+
+    valid_pred = pred_dsm[np.isfinite(pred_dsm)]
+    if valid_pred.size < 100:
+        raise RuntimeError(
+            "Predicted DSM has too few valid pixels after masks. "
+            "Rendering is likely invalid/background-only."
+        )
+    if np.nanstd(valid_pred) <= 1e-6:
+        raise RuntimeError(
+            "Predicted DSM is almost constant after masks, so DSM registration is ill-posed. "
+            "Please inspect render outputs (likely background-only). "
+            "Tip: check render logs for [RENDER][ACC_OPACITY], and inspect rawrender/accumulated_opacity outputs."
+        )
+
     # register and compute mae
     transform = dsmr.compute_shift(gt_dsm, pred_dsm, scaling=False)
     pred_rdsm = dsmr.apply_shift(pred_dsm, *transform)

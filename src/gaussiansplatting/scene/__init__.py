@@ -94,6 +94,7 @@ class Scene:
                 init_opacity=args.init_opacity,
                 init_scale_multiplier=args.init_scale_multiplier,
                 init_scale_floor=args.init_scale_floor,
+                init_scale_ceiling=args.init_scale_ceiling,
                 init_random_points=args.init_random_points,
                 init_random_points_bbox_scale=args.init_random_points_bbox_scale
             )

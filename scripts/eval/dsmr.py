@@ -95,7 +95,11 @@ def ncc(u, v, dx=0, dy=0):
 
     muu, muv, sigu, sigv, xcorr = mean_std(u, v, dx, dy)
 
-    return xcorr / (sigu * sigv)
+    # return xcorr / (sigu * sigv)
+    denom = sigu * sigv
+    if not np.isfinite(denom) or denom <= 1e-12:
+        return -np.inf
+    return xcorr / denom
 
 
 def compute_ncc(u, v, irange, initdx, initdy):
@@ -170,6 +174,13 @@ def compute_shift(dsm_ref, dsm_sec, scaling=True):
     dx, dy = recursive_ncc(dsm_ref, dsm_sec)
 
     muu, muv, sigu, sigv, xcorr = mean_std(dsm_ref, dsm_sec, dx, dy)
+
+    if (not np.isfinite(sigu)) or (not np.isfinite(sigv)) or sigv <= 1e-12 or sigu <= 1e-12:
+        raise RuntimeError(
+            "DSM registration failed: one of the DSMs has near-zero variance after masking/overlap. "
+            "This usually means predicted DSM is empty/constant or has no valid overlap with GT."
+        )
+
 
     a = sigu / sigv if scaling else 1
     b = muu - muv * a
