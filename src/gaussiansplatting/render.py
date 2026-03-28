@@ -218,7 +218,8 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
         if max_opacity < 1e-3:
             print(
                 "[RENDER][WARN] Accumulated opacity is near zero for all views. "
-                "Rendered images may be background-only (magenta)."
+                # "Rendered images may be background-only (magenta)."
+                "Rendered images may be background-only."
             )
 
 
@@ -239,7 +240,9 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
                 invalid = gaussians.get_opacity < opacity_treshold
             gaussians._opacity[invalid] = -20.0
 
-        bg_color = [1,0,1,scene.getTrainCameras()[0].altitude_bounds[0].item(),0]
+        # bg_color = [1,0,1,scene.getTrainCameras()[0].altitude_bounds[0].item(),0]
+        bg_rgb = [1, 1, 1] if dataset.white_background else [0, 0, 0]
+        bg_color = [*bg_rgb, scene.getTrainCameras()[0].altitude_bounds[0].item(), 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
 
         if not skip_train:

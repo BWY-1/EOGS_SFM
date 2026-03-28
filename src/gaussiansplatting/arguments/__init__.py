@@ -26,16 +26,24 @@ class ParamGroup:
                 key = key[1:]
             t = type(value)
             value = value if not fill_none else None
+            long_opt = "--" + key
+            kebab_opt = "--" + key.replace("_", "-")
+            long_opts = [long_opt] if kebab_opt == long_opt else [long_opt, kebab_opt]
             if shorthand:
+                short_opt = "-" + key[0:1]
                 if t is bool:
-                    group.add_argument("--" + key, ("-" + key[0:1]), default=value, action="store_true")
+                    # group.add_argument("--" + key, ("-" + key[0:1]), default=value, action="store_true")
+                    group.add_argument(*long_opts, short_opt, default=value, action="store_true")
                 else:
-                    group.add_argument("--" + key, ("-" + key[0:1]), default=value, type=t)
+                    # group.add_argument("--" + key, ("-" + key[0:1]), default=value, type=t)
+                    group.add_argument(*long_opts, short_opt, default=value, type=t)
             else:
                 if t is bool:
-                    group.add_argument("--" + key, default=value, action="store_true")
+                    # group.add_argument("--" + key, default=value, action="store_true")
+                    group.add_argument(*long_opts, default=value, action="store_true")
                 else:
-                    group.add_argument("--" + key, default=value, type=t)
+                    # group.add_argument("--" + key, default=value, type=t)
+                    group.add_argument(*long_opts, default=value, type=t)
 
     def extract(self, args):
         group = GroupParams()

@@ -42,7 +42,9 @@ def render_video(dataset : ModelParams, iteration : int, pipeline : PipelinePara
         # gaussians._opacity.fill_(gaussians.inverse_opacity_activation(torch.tensor(0.1, device=gaussians._xyz.device)))
 
         altitude_min, altitude_max = scene.getTrainCameras()[0].altitude_bounds.cpu().detach().numpy().tolist()
-        bg_color = [1,0,1,altitude_min,0]
+        # bg_color = [1,0,1,altitude_min,0]
+        bg_rgb = [1, 1, 1] if dataset.white_background else [0, 0, 0]
+        bg_color = [*bg_rgb, altitude_min, 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
 
         ###############

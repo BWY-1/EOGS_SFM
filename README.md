@@ -108,8 +108,39 @@ python scripts/dataset_creation/check_affine_pointcloud_alignment.py \
   --affine-models-json data/affine_models/JAX_068/affine_models.json
 ```
 
+For sparse SatelliteSfM initialization, a practical starter setup is to add random seed points around the sparse cloud:
+
+A full A/B/C ablation checklist is available at `docs/sparse_init_ablation.md`.
+```bash
+cd src/gaussiansplatting
+python train.py \
+  -s /home/m/EOGS-SFM/data/affine_models/JAX_068 \
+  --images /home/m/EOGS-SFM/data/JAX_068/images \
+  --eval \
+  -m /home/m/EOGS-SFM/output/jax068_sparse_init \
+  --sh_degree 0 \
+  --iterations 10000 \
+  --init-random-points 120000 \
+  --init-random-points-bbox-scale 1.05 \
+  --init-scale-ceiling 0.03
+```
+
 If you are checking a converted output from `--input-coord bbox_fit`, you can pass `--input-coord bbox_fit` to the checker (it will be interpreted as normalized/world coordinates).
+You can run a compact initialization diagnosis (bounds + camera consistency + rough point spacing):
+```bash
+python scripts/dataset_creation/debug_sfm_initialization.py \
+  --input-ply /home/m/EOGS-SFM/data/affine_models/JAX_068/points3d.ply \
+  --affine-models-json data/affine_models/JAX_068/affine_models.json
+```
+
+
+
 Note: the default converted filename is `points3d.ply` (lowercase `d`).
+Training always reads `data/affine_models/{SCENE}/points3d.ply` by filename.
+So if your validated conversion output is `points3d_enu_debug.ply`, rename/copy it before training:
+```bash
+cp data/affine_models/JAX_068/points3d_enu_debug.ply data/affine_models/JAX_068/points3d.ply
+```
 The checker also reports camera consistency ratio stats across cameras (uv in `[-1,1]` and altitude within bounds), which is useful to detect cases where bbox overlap looks okay but rendering is still background-only.
 
 Important: use the `affine_models.json` generated under `data/affine_models/{SCENE}/`, not a raw metadata file in another folder.
@@ -124,6 +155,18 @@ python scripts/dataset_creation/convert_satellitesfm_ply_to_eogs.py \
   --bbox-fit-anisotropic
 ```
 Tip: for isotropic bbox fitting, the converter now defaults to `--bbox-fit-isotropic-axes xy` to avoid altitude range dominating the scale.
+
+
+When visualizing exported `.iio` renders, avoid applying arbitrary gamma by default (it can cause washed-out tones).
+Use:
+```bash
+python scripts/eval/convert_iio_to_png.py \
+  --input /home/m/EOGS-SFM/output/jax_068_ft_T1/train_opNone/ours_30000/cc/00000.iio \
+  --output /home/m/EOGS-SFM/output/jax_068_ft_T1/train_opNone/ours_30000/cc/00000.png \
+  --gamma 1.0
+```
+
+
 If converter warns that `z_span` is much larger than affine bbox Z span, prefer `--bbox-fit-anisotropic` (or lower `--bbox-fit-fill-ratio`).
 
 cd src/gaussiansplatting
@@ -154,12 +197,12 @@ bash train.sh reproduceMain
 > When using uv: if `No module named 'torch'` when install: `submodules/diff-gaussian-rasterization`, `--no-build-isolation` (recommended by the latest uv version)
 
 
-dsm_name=$(ls /home/m/EOGS-SFM/output/jax068_debug_safe2/test_opNone/ours_7000/dsm/ | sort -V | tail -n 1)
+dsm_name=$(ls /home/m/EOGS-SFM/output/jax_068_ft_T1/test_opNone/ours_30000/dsm/ | sort -V | tail -n 1)
 
 python /home/m/EOGS-SFM/scripts/eval/eval_dsm.py \
-  --pred-dsm-path /home/m/EOGS-SFM/output/jax068_debug_safe2/test_opNone/ours_7000/dsm/${dsm_name} \
+  --pred-dsm-path /home/m/EOGS-SFM/output/jax_068_ft_T1/test_opNone/ours_30000/dsm/${dsm_name} \
   --gt-dir /home/m/EOGS-SFM/data/truth/JAX_068 \
-  --out-dir /home/m/EOGS-SFM/output/jax068_debug_safe2\
+  --out-dir /home/m/EOGS-SFM/output/jax_068_ft_T1\
   --aoi-id JAX_068
 
 
@@ -170,3 +213,56 @@ python scripts/dataset_creation/convert_satellitesfm_ply_to_eogs.py \
   --input-coord enu \
   --enu-observer-json /path/to/enu_observer_latlonalt.json \
   --dry-run-report
+
+python scripts/dataset_creation/debug_sfm_initialization.py \
+  --input-ply /home/m/EOGS-SFM/data/JAX_068/point_cloud.ply \
+  --affine-models-json data/affine_models/JAX_068/affine_models.json
+
+
+  python scripts/dataset_creation/convert_satellitesfm_ply_to_eogs.py \
+  --input-ply /home/m/EOGS-SFM/data/JAX_068/point_cloud.ply \
+  --affine-models-json data/affine_models/JAX_068/affine_models.json \
+  --output-ply data/affine_models/JAX_068/points3d_auto_debug.ply \
+  --input-coord auto \
+  --dry-run-report
+
+  python scripts/dataset_creation/convert_satellitesfm_ply_to_eogs.py \
+  --input-ply /home/m/EOGS-SFM/data/JAX_068/point_cloud.ply \
+  --affine-models-json data/affine_models/JAX_068/affine_models.json \
+  --output-ply data/affine_models/JAX_068/points3d_enu_debug.ply \
+  --input-coord enu \
+  --enu-observer-json /home/m/EOGS-SFM/data/JAX_068/enu_observer_latlonalt.json \
+  --dry-run-report
+
+  python scripts/dataset_creation/check_affine_pointcloud_alignment.py \
+  --input-ply data/affine_models/JAX_068/points3d.ply \
+  --affine-models-json data/affine_models/JAX_068/affine_models.json
+
+
+
+  python render.py -m /home/m/EOGS-SFM/output/jax_068_ft_T1 \
+    --iteration 2000 
+
+
+
+
+
+    cd src/gaussiansplatting
+
+# E1 baseline
+python train.py -s ${SRC} --images ${IMGS} --eval -m ${OUT}/jax068_E1 \
+  --sh_degree 0 --iterations 10000 \
+  --init-random-points 120000 --init-random-points-bbox-scale 1.05 \
+  --init-scale-ceiling 0.025 --init-opacity 0.02 --opacity-lr 0.015
+
+# E2 reduced random color influence
+python train.py -s ${SRC} --images ${IMGS} --eval -m ${OUT}/jax068_E2 \
+  --sh_degree 0 --iterations 10000 \
+  --init-random-points 40000 --init-random-points-bbox-scale 1.05 \
+  --init-scale-ceiling 0.025 --init-opacity 0.02 --opacity-lr 0.015
+
+# E3 no random points
+python train.py -s ${SRC} --images ${IMGS} --eval -m ${OUT}/jax068_E3 \
+  --sh_degree 0 --iterations 10000 \
+  --init-random-points 0 \
+  --init-scale-ceiling 0.025 --init-opacity 0.02 --opacity-lr 0.015

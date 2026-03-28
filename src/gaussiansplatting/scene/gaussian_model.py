@@ -176,8 +176,12 @@ class GaussianModel:
         features[:, 3:, 1:] = 0.0
 
         print("Number of points at initialisation : ", fused_point_cloud.shape[0])
+        if fused_point_cloud.shape[0] < 50000:
+            print("[INIT][WARN] Sparse initialization may converge slowly or to blurry geometry. "
+                  "Consider --init-random-points to densify the seed cloud.")
 
-        dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001)
+        # dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001)
+        dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(points_np).float().cuda()), 0.0000001)
         # def my_distCUDA2(points, k=1):
         #     from scipy.spatial import KDTree
         #     points_np = points.detach().cpu().float().numpy()
