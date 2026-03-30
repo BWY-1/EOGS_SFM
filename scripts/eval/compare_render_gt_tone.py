@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 import argparse
 import numpy as np
-import iio
+
+from iio_compat import load_array, save_uint8_image
 
 
 def stats(name, x):
     x = np.asarray(x, dtype=np.float32)
     print(f"[{name}] shape={x.shape}, dtype={x.dtype}")
+    print(
+        "  outside_[0,1]="
+        f"{((x < 0.0) | (x > 1.0)).mean():.4f}, "
+        f"below_0={(x < 0.0).mean():.4f}, above_1={(x > 1.0).mean():.4f}"
+    )
     for c, n in enumerate(["R", "G", "B"]):
         ch = x[..., c]
         p = np.percentile(ch, [1, 5, 50, 95, 99])
@@ -37,10 +43,13 @@ def main():
     p.add_argument("--save-corrected", default=None, help="Optional output .png for linearly corrected render preview")
     args = p.parse_args()
 
-    r = np.asarray(iio.read(args.render), dtype=np.float32)
-    g = np.asarray(iio.read(args.gt), dtype=np.float32)
+    r = np.asarray(load_array(args.render), dtype=np.float32)
+    g = np.asarray(load_array(args.gt), dtype=np.float32)
     if r.shape != g.shape or r.ndim != 3 or r.shape[2] != 3:
         raise RuntimeError(f"Expected matching HxWx3 shapes, got render={r.shape}, gt={g.shape}")
+
+    stats("render_raw", r)
+    stats("gt_raw", g)
 
     r = np.clip(r, 0.0, 1.0)
     g = np.clip(g, 0.0, 1.0)
@@ -55,7 +64,7 @@ def main():
 
     if args.save_corrected:
         corr = np.clip(r * a[None, None, :] + b[None, None, :], 0.0, 1.0)
-        iio.write(args.save_corrected, (corr * 255.0 + 0.5).astype(np.uint8))
+        save_uint8_image(args.save_corrected, (corr * 255.0 + 0.5).astype(np.uint8))
         print(f"Saved corrected preview: {args.save_corrected}")
 
 

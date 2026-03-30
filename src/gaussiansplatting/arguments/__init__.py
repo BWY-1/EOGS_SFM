@@ -117,6 +117,7 @@ class OptimizationParams(ParamGroup):
         self.iterstart_L_erank = -1
         self.iterstart_L_nll = 9999999999
         self.iterstart_L_accumulated_opacity = 9999999999
+        self.iterstart_L_chromaticity = 0
 
         # loss terms weights
         self.w_L_opacity =0.005#0.10
@@ -129,6 +130,7 @@ class OptimizationParams(ParamGroup):
         self.w_L_nll = 0.10
         self.w_L_translucentshadows = 1e-2
         self.w_L_accumulated_opacity = 0.0
+        self.w_L_chromaticity = 0.05
 
         # other hyperparameters
         self.virtual_camera_extent = 0.01
@@ -159,4 +161,3 @@ def get_combined_args(parser : ArgumentParser):
         if v is not None:
             merged_dict[k] = v
     return Namespace(**merged_dict)
-

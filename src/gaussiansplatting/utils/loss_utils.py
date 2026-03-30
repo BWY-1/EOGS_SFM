@@ -20,6 +20,22 @@ def l1_loss(network_output, gt):
 def l2_loss(network_output, gt):
     return ((network_output - gt) ** 2).mean()
 
+
+def chromaticity_loss(network_output, gt, eps=1e-3, min_luma=0.05):
+    pred = network_output.clamp_min(0.0)
+    target = gt.clamp_min(0.0)
+
+    pred_sum = pred.sum(dim=0, keepdim=True)
+    target_sum = target.sum(dim=0, keepdim=True)
+    pred_chroma = pred / (pred_sum + eps)
+    target_chroma = target / (target_sum + eps)
+
+    target_luma = target.mean(dim=0, keepdim=True)
+    weights = ((target_luma - min_luma) / max(1.0 - min_luma, eps)).clamp(0.0, 1.0)
+    weighted_diff = (pred_chroma - target_chroma).abs() * weights
+    normalizer = (weights.sum() * pred.shape[0]).clamp_min(eps)
+    return weighted_diff.sum() / normalizer
+
 def gaussian(window_size, sigma):
     gauss = torch.Tensor([exp(-(x - window_size // 2) ** 2 / float(2 * sigma ** 2)) for x in range(window_size)])
     return gauss / gauss.sum()
@@ -61,4 +77,3 @@ def _ssim(img1, img2, window, window_size, channel, size_average=True):
         return ssim_map.mean()
     else:
         return ssim_map.mean(1).mean(1).mean(1)
-

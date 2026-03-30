@@ -12,7 +12,7 @@
 import os
 import torch
 from random import randint
-from utils.loss_utils import l1_loss, ssim
+from utils.loss_utils import chromaticity_loss, l1_loss, ssim
 from gaussian_renderer import render
 import sys
 from scene import Scene, GaussianModel
@@ -179,6 +179,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         L_translucentshadows = 0
         sun_altitude_diff = None
         L_accumulated_opacity = 0
+        L_chromaticity = 0
         opacity = gaussians.get_opacity.squeeze()
 
         if iteration > opt.iterstart_L_accumulated_opacity:
@@ -260,6 +261,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # Ll1rel = (image - gt_image).abs() / (gt_image.abs() + 1/255)
         # Ll1rel = Ll1rel.mean()
         Lphotometric = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
+        if iteration > opt.iterstart_L_chromaticity:
+            L_chromaticity = chromaticity_loss(image, gt_image)
         L_altitude_reference = (altitude_render - viewpoint_cam.reference_altitude).abs().mean()
         if iteration > args.iterstart_L_nll:
             betaprime = (viewpoint_cam.transient_mask.clip(0,1)+0.05).square()
@@ -281,6 +284,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             + opt.w_L_nll * L_nll
             + opt.w_L_translucentshadows * L_translucentshadows
             + opt.w_L_accumulated_opacity * L_accumulated_opacity
+            + opt.w_L_chromaticity * L_chromaticity
         )
         # # Add a high constrast loss
         # inverse_constrast = 0.045
@@ -322,6 +326,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 tb_writer.add_scalar('L_TV_altitude', L_TV_altitude, iteration) 
                 tb_writer.add_scalar('L_altitude_reference', L_altitude_reference, iteration)
                 tb_writer.add_scalar('L_erank', L_erank, iteration)
+                tb_writer.add_scalar('L_chromaticity', L_chromaticity, iteration)
 
             # Color normalization before saving for the last time
             if iteration == opt.iterations:

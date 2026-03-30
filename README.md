@@ -124,6 +124,8 @@ python train.py \
   --init-random-points-bbox-scale 1.05 \
   --init-scale-ceiling 0.03
 ```
+Training now includes a chromaticity loss by default (`--w-L-chromaticity 0.05`) to stabilize hue/channel balance even when shading differs.
+If you want to delay it or tune its strength, use `--iterstart-L-chromaticity` and `--w-L-chromaticity`.
 
 If you are checking a converted output from `--input-coord bbox_fit`, you can pass `--input-coord bbox_fit` to the checker (it will be interpreted as normalized/world coordinates).
 You can run a compact initialization diagnosis (bounds + camera consistency + rough point spacing):
@@ -163,6 +165,14 @@ Use:
 python scripts/eval/convert_iio_to_png.py \
   --input /home/m/EOGS-SFM/output/jax_068_ft_T1/train_opNone/ours_30000/cc/00000.iio \
   --output /home/m/EOGS-SFM/output/jax_068_ft_T1/train_opNone/ours_30000/cc/00000.png \
+  --gamma 1.0
+```
+If the script reports many values `above_1`, the preview is being clipped to white; for display-only inspection use:
+```bash
+python scripts/eval/convert_iio_to_png.py \
+  --input /home/m/EOGS-SFM/output/jax_068_ft_T1/train_opNone/ours_30000/final/00016.iio \
+  --output /home/m/EOGS-SFM/output/jax_068_ft_T1/train_opNone/ours_30000/final/00016_p99.png \
+  --normalize p99 \
   --gamma 1.0
 ```
 
