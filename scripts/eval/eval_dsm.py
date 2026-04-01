@@ -1,10 +1,18 @@
 import dsmr
-import iio
 import rasterio
 import numpy as np
 import os
 
 from typing import Optional
+
+from iio_compat import load_array
+
+def align_mask_to_shape(mask: np.ndarray, shape) -> np.ndarray:
+    aligned = np.zeros(shape, dtype=bool)
+    h = min(shape[0], mask.shape[0])
+    w = min(shape[1], mask.shape[1])
+    aligned[:h, :w] = mask[:h, :w].astype(bool)
+    return aligned
 
 def dsm_pointwise_diff(in_dsm_path: str, gt_dsm_path: str, dsm_metadata, water_mask_path: Optional[str] = None, vis_mask_path: Optional[str] = None, tree_mask_path: Optional[str] = None):
     """
@@ -49,19 +57,23 @@ def dsm_pointwise_diff(in_dsm_path: str, gt_dsm_path: str, dsm_metadata, water_m
             water_mask = water_mask.astype(bool)
         if ("CLS.tif" in water_mask_path) and (os.path.exists(water_mask_path.replace("CLS.tif", "WATER.png"))):
             #print("found alternative water mask!")
-            mask = iio.read(water_mask_path.replace("CLS.tif", "WATER.png"))[..., 0]
+            mask = load_array(water_mask_path.replace("CLS.tif", "WATER.png"))[..., 0]
             water_mask = mask == 0
 
-        water_mask = water_mask[:pred_dsm.shape[0], :pred_dsm.shape[1]]
+        water_mask = align_mask_to_shape(water_mask, pred_dsm.shape)
         pred_dsm[water_mask] = np.nan
 
     # Use visibility mask if available
     if vis_mask_path is not None:
-        vis_mask = rasterio.open(vis_mask_path).read()[0,...] > 0.5
+        with rasterio.open(vis_mask_path) as src:
+            vis_mask = src.read()[0,...] > 0.5
+        vis_mask = align_mask_to_shape(vis_mask, pred_dsm.shape)
         pred_dsm[vis_mask] = np.nan
 
     if tree_mask_path is not None:
-        tree_mask = rasterio.open(tree_mask_path).read()[0,...] > 0.5
+        with rasterio.open(tree_mask_path) as src:
+            tree_mask = src.read()[0,...] > 0.5
+        tree_mask = align_mask_to_shape(tree_mask, pred_dsm.shape)
         pred_dsm[np.logical_not(tree_mask)] = np.nan
 
 

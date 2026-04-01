@@ -93,13 +93,20 @@ python scripts/dataset_creation/convert_satellitesfm_ply_to_eogs.py \
 ```
 Important safety note for ENU conversion: this chain is most reliable on small scenes (roughly <1km², no UTM-zone crossing).  
 For larger areas, direct geodetic integration is recommended; ENU mode now enforces safety checks by default and can be overridden with `--allow-enu-unsafe`.
+关于 ENU 转换的重要安全提示：该转换链在小型场景下（大致 <1 km²，且不跨越 UTM 分区）最为可靠。
+对于较大区域，建议采用直接大地坐标集成方案；目前 ENU 模式默认启用安全检查，如需绕过此检查，可使用 `--allow-enu-unsafe` 参数。
 
 
 `--input-coord auto` now falls back to `bbox_fit` by default when both `utm` and `normalized` do not match the affine bounds.  
 If you prefer strict behavior, set `--auto-fallback error`.
 For a more detailed auto-mode diagnosis (bbox + camera-consistency scoring), add `--dry-run-report`.
+现在，当 `utm` 和 `normalized` 坐标均与仿射边界不匹配时，`--input-coord auto` 默认将回退（fallback）至 `bbox_fit` 模式。
+如果您偏好严格的匹配行为，请将 `--auto-fallback` 设置为 `error`。
+如需获取更详细的自动模式诊断信息（包含边界框及相机一致性评分），请添加 `--dry-run-report` 参数。
+
 
 If conversion reports `Output points: 0`, first retry without cropping (`--crop-to-scene-bounds`) to verify coordinate alignment, then tune `--input-coord` and `--bounds-margin`.
+如果转换报告显示 `Output points: 0`，请首先尝试在不进行裁剪（即不使用 `--crop-to-scene-bounds` 参数）的情况下重试，以验证坐标对齐是否正确；随后，请调整 `--input-coord` 和 `--bounds-margin` 参数。
 
 You can diagnose coordinate mismatch before conversion:
 ```bash
@@ -109,7 +116,7 @@ python scripts/dataset_creation/check_affine_pointcloud_alignment.py \
 ```
 
 For sparse SatelliteSfM initialization, a practical starter setup is to add random seed points around the sparse cloud:
-
+对于稀疏 SatelliteSfM 初始化，一种实用的初始设置是在稀疏点云周围添加随机种子点
 A full A/B/C ablation checklist is available at `docs/sparse_init_ablation.md`.
 ```bash
 cd src/gaussiansplatting
@@ -126,10 +133,13 @@ python train.py \
 ```
 Training now includes a chromaticity loss by default (`--w-L-chromaticity 0.05`) to stabilize hue/channel balance even when shading differs.
 If you want to delay it or tune its strength, use `--iterstart-L-chromaticity` and `--w-L-chromaticity`.
+现在的训练默认包含色度损失（`--w-L-chromaticity 0.05`），旨在即使在光影分布不同的情况下，也能稳定色相与通道的平衡。
+如果您希望推迟该损失项的启用时机或调整其权重，请使用 `--iterstart-L-chromaticity` 和 `--w-L-chromaticity` 参数。
 
 If you are checking a converted output from `--input-coord bbox_fit`, you can pass `--input-coord bbox_fit` to the checker (it will be interpreted as normalized/world coordinates).
 You can run a compact initialization diagnosis (bounds + camera consistency + rough point spacing):
 ```bash
+ 点云能不能训练、该用什么参数转换
 python scripts/dataset_creation/debug_sfm_initialization.py \
   --input-ply /home/m/EOGS-SFM/data/affine_models/JAX_068/points3d.ply \
   --affine-models-json data/affine_models/JAX_068/affine_models.json
@@ -147,6 +157,10 @@ The checker also reports camera consistency ratio stats across cameras (uv in `[
 
 Important: use the `affine_models.json` generated under `data/affine_models/{SCENE}/`, not a raw metadata file in another folder.
 If both `utm` and `normalized` diagnostics fail (in-bounds ratio near 0), try:
+该检查工具还会报告跨摄像机的一致性比率统计数据（即 UV 坐标位于 `[-1,1]` 范围内，且高度处于预设界限内）；这对于检测以下情况非常有用：尽管边界框（bbox）的重叠情况看似正常，但实际渲染结果却仍仅显示为背景。
+
+重要提示：请务必使用生成于 `data/affine_models/{SCENE}/` 路径下的 `affine_models.json` 文件，而不要使用位于其他文件夹内的原始元数据文件。
+如果 `utm` 和 `normalized` 这两项诊断检查均告失败（即处于界限内的比率接近于 0），请尝试执行以下操作：
 ```bash
 python scripts/dataset_creation/convert_satellitesfm_ply_to_eogs.py \
   --input-ply /path/to/satellitesfm_sparse.ply \
@@ -206,26 +220,52 @@ bash train.sh reproduceMain
 > [!TIP]
 > When using uv: if `No module named 'torch'` when install: `submodules/diff-gaussian-rasterization`, `--no-build-isolation` (recommended by the latest uv version)
 
-
-dsm_name=$(ls /home/m/EOGS-SFM/output/jax_068_ft_T1/test_opNone/ours_30000/dsm/ | sort -V | tail -n 1)
+jax068_E1
+dsm_name=$(ls /home/m/EOGS-SFM/output/jax068_uniform_E3/test_opNone/ours_10000/dsm/ | sort -V | tail -n 1)
 
 python /home/m/EOGS-SFM/scripts/eval/eval_dsm.py \
-  --pred-dsm-path /home/m/EOGS-SFM/output/jax_068_ft_T1/test_opNone/ours_30000/dsm/${dsm_name} \
+  --pred-dsm-path /home/m/EOGS-SFM/output/jax068_uniform_E3/test_opNone/ours_10000/dsm/${dsm_name} \
   --gt-dir /home/m/EOGS-SFM/data/truth/JAX_068 \
-  --out-dir /home/m/EOGS-SFM/output/jax_068_ft_T1\
+  --out-dir /home/m/EOGS-SFM/output/jax068_uniform_E3\
   --aoi-id JAX_068
 
+You can also run training, rendering, visual metrics, DSM MAE, and timing as one end-to-end command:
+```bash
+python scripts/eval/full_pipeline_eval.py \
+  --source-path /home/m/EOGS-SFM/data/affine_models/JAX_068 \
+  --images /home/m/EOGS-SFM/data/JAX_068/images \
+  --model-path /home/m/EOGS-SFM/output/jax068_full_eval \
+  --gt-dir /home/m/EOGS-SFM/data/truth/JAX_068 \
+  --aoi-id JAX_068 \
+  --iterations 30000 \
+  --train-extra-args "--sh_degree 0 --init-random-points 0 --init-scale-ceiling 0.025 --init-opacity 0.02 --opacity-lr 0.015"
+```
+The script writes a summary JSON with SSIM/PSNR/LPIPS, DSM MAE, training time, and rendering time under the model output directory.
 
+
+                                        第四
+python scripts/eval/full_pipeline_eval.py \
+  --source-path /home/m/EOGS-SFM/data/affine_models/JAX_004 \
+  --images /home/m/EOGS-SFM/data/images/JAX_004 \
+  --model-path /home/m/EOGS-SFM/output/jax004_full_eval \
+  --gt-dir /home/m/EOGS-SFM/data/truth/JAX_004 \
+  --aoi-id JAX_004 \
+  --iterations 30000 \
+  --train-extra-args "--sh_degree 0 --init-random-points 0 --init-scale-ceiling 0.025 --init-opacity 0.02 --opacity-lr 0.015 --w-L-chromaticity 0.08 --iterstart-L-global-color 100 --w-L-global-color 0.15"
+
+
+
+                                           第一
 python scripts/dataset_creation/convert_satellitesfm_ply_to_eogs.py \
-  --input-ply /home/m/EOGS-SFM/data/JAX_068/point_cloud.ply \
-  --affine-models-json /home/m/EOGS-SFM/data/affine_models/JAX_068/affine_models.json \
-  --output-ply /home/m/EOGS-SFM/data/affine_models/JAX_068/points3d_enu.ply \
+  --input-ply /home/m/EOGS-SFM/data/JAX_004/point_cloud.ply \
+  --affine-models-json /home/m/EOGS-SFM/data/affine_models/JAX_004/affine_models.json \
+  --output-ply /home/m/EOGS-SFM/data/affine_models/JAX_004/points3d.ply \
   --input-coord enu \
-  --enu-observer-json /path/to/enu_observer_latlonalt.json \
+  --enu-observer-json /home/m/EOGS-SFM/data/JAX_004/enu_observer_latlonalt.json \
   --dry-run-report
-
+                                               第二（得到参数设置）
 python scripts/dataset_creation/debug_sfm_initialization.py \
-  --input-ply /home/m/EOGS-SFM/data/JAX_068/point_cloud.ply \
+  --input-ply /home/m/EOGS-SFM/data/affine_models/JAX_004/points3d.ply \
   --affine-models-json data/affine_models/JAX_068/affine_models.json
 
 
@@ -243,15 +283,15 @@ python scripts/dataset_creation/debug_sfm_initialization.py \
   --input-coord enu \
   --enu-observer-json /home/m/EOGS-SFM/data/JAX_068/enu_observer_latlonalt.json \
   --dry-run-report
-
+                                                第三
   python scripts/dataset_creation/check_affine_pointcloud_alignment.py \
-  --input-ply data/affine_models/JAX_068/points3d.ply \
-  --affine-models-json data/affine_models/JAX_068/affine_models.json
+  --input-ply data/affine_models/JAX_004/points3d.ply \
+  --affine-models-json data/affine_models/JAX_004/affine_models.json
 
 
 
-  python render.py -m /home/m/EOGS-SFM/output/jax_068_ft_T1 \
-    --iteration 2000 
+  python render.py -m /home/m/EOGS-SFM/output/jax068_uniform_E3 \
+    --iteration 10000 
 
 
 
@@ -259,7 +299,7 @@ python scripts/dataset_creation/debug_sfm_initialization.py \
 
     cd src/gaussiansplatting
 
-# E1 baseline
+# E1 baseline                 最好
 python train.py -s ${SRC} --images ${IMGS} --eval -m ${OUT}/jax068_E1 \
   --sh_degree 0 --iterations 10000 \
   --init-random-points 120000 --init-random-points-bbox-scale 1.05 \
@@ -271,8 +311,31 @@ python train.py -s ${SRC} --images ${IMGS} --eval -m ${OUT}/jax068_E2 \
   --init-random-points 40000 --init-random-points-bbox-scale 1.05 \
   --init-scale-ceiling 0.025 --init-opacity 0.02 --opacity-lr 0.015
 
-# E3 no random points
+# E3 no random points      DSM精度最高
 python train.py -s ${SRC} --images ${IMGS} --eval -m ${OUT}/jax068_E3 \
+  --sh_degree 0 --iterations 10000 \
+  --init-random-points 0 \
+  --init-scale-ceiling 0.025 --init-opacity 0.02 --opacity-lr 0.015
+
+                                                           查看图片
+python scripts/eval/convert_iio_to_png.py \
+  --input /home/m/EOGS-SFM/output/jax068_full_eval/train_opNone/ours_30000/final/00001.iio \
+  --output /home/m/EOGS-SFM/output/jax068_full_eval/train_opNone/ours_30000/final/test.png \
+  --gamma 1.0 \
+  --normalize p99
+
+                                                         使用均匀生成
+SRC=/home/m/EOGS-SFM/data/affine_models/JAX_068
+IMGS=/home/m/EOGS-SFM/data/JAX_068/images
+OUT=/home/m/EOGS-SFM/output
+
+cp -r ${SRC} /home/m/EOGS-SFM/data/affine_models/JAX_068_uniform
+rm /home/m/EOGS-SFM/data/affine_models/JAX_068_uniform/points3d.ply
+
+cd /home/m/EOGS-SFM/src/gaussiansplatting
+python train.py -s /home/m/EOGS-SFM/data/affine_models/JAX_068_uniform \
+  --images ${IMGS} --eval \
+  -m ${OUT}/jax068_uniform_E3 \
   --sh_degree 0 --iterations 10000 \
   --init-random-points 0 \
   --init-scale-ceiling 0.025 --init-opacity 0.02 --opacity-lr 0.015

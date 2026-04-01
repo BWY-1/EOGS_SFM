@@ -36,6 +36,35 @@ def chromaticity_loss(network_output, gt, eps=1e-3, min_luma=0.05):
     normalizer = (weights.sum() * pred.shape[0]).clamp_min(eps)
     return weighted_diff.sum() / normalizer
 
+
+def global_color_loss(network_output, gt, eps=1e-3):
+    pred = network_output.clamp_min(0.0)
+    target = gt.clamp_min(0.0)
+
+    pred_mean = pred.mean(dim=(1, 2))
+    target_mean = target.mean(dim=(1, 2))
+
+    pred_std = pred.std(dim=(1, 2), unbiased=False)
+    target_std = target.std(dim=(1, 2), unbiased=False)
+
+    pred_chroma = pred_mean / (pred_mean.sum(dim=0, keepdim=True) + eps)
+    target_chroma = target_mean / (target_mean.sum(dim=0, keepdim=True) + eps)
+
+    pred_std_ratio = pred_std / (pred_std.mean(dim=0, keepdim=True) + eps)
+    target_std_ratio = target_std / (target_std.mean(dim=0, keepdim=True) + eps)
+
+    mean_loss = (pred_mean - target_mean).abs().mean()
+    contrast_loss = (pred_std - target_std).abs().mean()
+    chroma_center_loss = (pred_chroma - target_chroma).abs().mean()
+    chroma_contrast_loss = (pred_std_ratio - target_std_ratio).abs().mean()
+
+    return (
+        0.5 * mean_loss
+        + 0.5 * contrast_loss
+        + 1.0 * chroma_center_loss
+        + 1.0 * chroma_contrast_loss
+    )
+
 def gaussian(window_size, sigma):
     gauss = torch.Tensor([exp(-(x - window_size // 2) ** 2 / float(2 * sigma ** 2)) for x in range(window_size)])
     return gauss / gauss.sum()
